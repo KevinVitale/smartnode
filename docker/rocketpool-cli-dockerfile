@@ -1,0 +1,42 @@
+###
+# Builder
+###
+
+
+# Start from golang image
+FROM golang:latest AS builder
+
+# Copy source files
+ADD ./rocketpool-cli /src/rocketpool-cli
+ADD ./shared /src/shared
+ADD ./go.mod /src/go.mod
+ADD ./go.sum /src/go.sum
+
+# Compile & install
+WORKDIR /src
+RUN CGO_ENABLED=0 go install ./rocketpool-cli
+
+RUN curl -L --fail https://github.com/docker/compose/releases/download/1.27.4/run.sh -o /usr/local/bin/docker-compose
+RUN chmod +x /usr/local/bin/docker-compose
+
+
+###
+# Process
+###
+
+
+# Start from ubuntu image
+# FROM ubuntu:20.04
+FROM docker:dind
+
+# Install OS dependencies
+RUN apk add --no-cache \
+        libc6-compat \
+        curl
+
+# Copy binary
+COPY --from=builder /go/bin/rocketpool-cli /usr/local/bin/rocketpool-cli
+COPY --from=builder /usr/local/bin/docker-compose /usr/local/bin/docker-compose
+
+# Container entry point
+ENTRYPOINT ["/go/bin/rocketpool-cli"]
